@@ -3,6 +3,9 @@ from app import models
 from passlib.context import CryptContext
 from app.logger import logger
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import update
+from sqlalchemy.exc import SQLAlchemyError
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -62,29 +65,50 @@ def credit_wallet(db: Session, wallet, amount):
         raise
 
 
-def debit_wallet(db: Session, wallet, amount):
-    if wallet.balance < amount:
-        logger.warning(f"Insufficient balance for wallet {wallet.id}")
-        return None
-
+def debit_wallet(db: Session, wallet_id, amount):
     try:
-        wallet.balance -= amount
+        # Atomic conditional update
+        stmt = (
+            update(models.Wallet)
+            .where(models.Wallet.id == wallet_id)
+            .where(models.Wallet.balance >= amount)
+            .values(balance=models.Wallet.balance - amount)
+        )
 
+        result = db.execute(stmt)
+
+        if result.rowcount == 0:
+            db.rollback()
+            logger.warning(
+                f"Atomic debit failed (insufficient funds): wallet={wallet_id}, amount={amount}"
+            )
+            return None
+
+        # Insert ledger entry
         entry = models.LedgerEntry(
-            wallet_id=wallet.id,
+            wallet_id=wallet_id,
             amount=amount,
-            type="DEBIT"
+            type="DEBIT",
         )
 
         db.add(entry)
+
+        # Single commit at end
         db.commit()
-        db.refresh(wallet)
 
-        logger.info(f"Debited {amount} from wallet {wallet.id}")
+        updated_wallet = (
+            db.query(models.Wallet)
+            .filter(models.Wallet.id == wallet_id)
+            .first()
+        )
 
-        return wallet
+        logger.info(
+            f"Atomic debit successful: wallet={wallet_id}, amount={amount}"
+        )
 
-    except Exception as e:
+        return updated_wallet
+
+    except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Debit failed for wallet {wallet.id}: {str(e)}")
+        logger.error(f"Atomic debit DB error: {str(e)}")
         raise

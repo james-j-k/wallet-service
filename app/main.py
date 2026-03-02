@@ -64,7 +64,7 @@ def debit(wallet_id: str, request: schemas.AmountRequest, db: Session = Depends(
         logger.warning(f"Debit failed: Wallet not found {wallet_id}")
         raise HTTPException(status_code=404, detail="Wallet not found")
 
-    updated = crud.debit_wallet(db, wallet, request.amount)
+    updated = crud.debit_wallet(db, wallet_id, request.amount)
 
     if updated is None:
         logger.warning(f"Insufficient balance for wallet {wallet_id}")
