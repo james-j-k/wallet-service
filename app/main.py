@@ -132,7 +132,7 @@ def credit(
         f"Credit request | user: {current_user.id} | amount: {request.amount}"
     )
 
-    updated = crud.credit_wallet(db, wallet, request.amount)
+    updated = crud.credit_wallet(db, wallet.id, request.amount)
 
     logger.info(
         f"Credit successful | wallet: {wallet.id} | new_balance: {updated.balance}"

@@ -41,27 +41,48 @@ def create_wallet(db: Session, user_id):
     return wallet
 
 
-def credit_wallet(db: Session, wallet, amount):
+def credit_wallet(db: Session, wallet_id, amount):
     try:
-        wallet.balance += amount
+        # Atomic balance increment
+        stmt = (
+            update(models.Wallet)
+            .where(models.Wallet.id == wallet_id)
+            .values(balance=models.Wallet.balance + amount)
+        )
 
+        result = db.execute(stmt)
+
+        if result.rowcount == 0:
+            db.rollback()
+            return None
+
+        # Insert ledger entry
         entry = models.LedgerEntry(
-            wallet_id=wallet.id,
+            wallet_id=wallet_id,
             amount=amount,
             type="CREDIT"
         )
 
         db.add(entry)
+
+        # Single commit at end
         db.commit()
-        db.refresh(wallet)
 
-        logger.info(f"Credited {amount} to wallet {wallet.id}")
+        updated_wallet = (
+            db.query(models.Wallet)
+            .filter(models.Wallet.id == wallet_id)
+            .first()
+        )
 
-        return wallet
+        logger.info(
+            f"Atomic credit successful: wallet={wallet_id}, amount={amount}"
+        )
 
-    except Exception as e:
+        return updated_wallet
+
+    except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Credit failed for wallet {wallet.id}: {str(e)}")
+        logger.error(f"Atomic credit DB error: {str(e)}")
         raise
 
 
