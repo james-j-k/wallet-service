@@ -1,16 +1,26 @@
 import requests
 import concurrent.futures
 
-WALLET_ID = "476bcc4b-7129-4bea-9c0b-4f6a106261ec"
-URL = f"http://127.0.0.1:8000/wallet/{WALLET_ID}/debit"
+TOKEN = "PASTE_YOUR_JWT_HERE"
+
+URL = "http://127.0.0.1:8000/wallet/debit"
+
+headers = {
+    "Authorization": f"Bearer {TOKEN}"
+}
 
 def make_request():
     try:
-        response = requests.post(URL, json={"amount": 10})
+        response = requests.post(
+            URL,
+            json={"amount": 10},
+            headers=headers
+        )
         return response.status_code
     except Exception as e:
         print("Request error:", e)
         return None
+
 
 if __name__ == "__main__":
     with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:

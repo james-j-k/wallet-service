@@ -3,6 +3,9 @@ from uuid import UUID
 from decimal import Decimal
 from datetime import datetime
 
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -39,3 +42,7 @@ class LedgerResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
